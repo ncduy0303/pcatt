@@ -1,14 +1,17 @@
-# A partition cover approach to tokenization
+# A Partition Cover Approach to Tokenization
+---
+
+[NeurIPS 2025](https://neurips.cc/virtual/2025/poster/115918) | [arXiv](https://arxiv.org/abs/2501.06246)
+
+---
+
 In this work, we formulate tokenization as an optimization objective, show that it is NP-hard via a simple reduction from vertex cover, and propose a polynomial-time greedy algorithm **GreedTok**.
 Our formulation naturally relaxes to the well-studied weighted maximum coverage problem which has a simple $(1 - 1/e)$-approximation greedy algorithm.
 
-### Compute Performance Update
-Compared to the base implementation, beta6 has a considerable speedup! The key difference is the implementation of greedy (lazy) updates on top of greedy choice. 
-
 <center>
 
-|Dataset| $k$ | #uniq words | #candidates | Current (0.14.x) | Gain from lazy updates |
-| ------- | --- | -------: | -------: | -------:  | :----: |
+|Dataset| $k$ | #uniq words | #candidates | Time | Gain from lazy updates |
+| ------- | --- | -------: | -------: | -------  | :----: |
 | UN           |5K |105,505  |884,630  |  ~6 seconds | x23 |
 | arXiv        |5K |881,233  |7,625,530| ~63 seconds | x26 |
 | Wiki         |10K|8,769,943|93,243,449| ~11 minutes | x68 |
@@ -59,4 +62,11 @@ Refer to [eval_hf.ipynb](https://github.com/PreferredAI/aoatt/blob/main/eval_hf.
 Evaluations in [eval_notebook.ipynb](https://github.com/PreferredAI/aoatt/blob/main/eval_notebook.ipynb).
 
 ### Citation
-Withheld for repo anonymity
+```
+@inproceedings{lim2025partitioncoverapproachtokenization,
+      title={A Partition Cover Approach to Tokenization},
+      author={Jia Peng Lim and Shawn Tan and Davin Choo and Hady W. Lauw},
+      year={2025}
+      booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems},
+}
+```
