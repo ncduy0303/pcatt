@@ -403,8 +403,17 @@ public:
             {
                 d_counter = 0;
 
-                for_each(
-                    execution::par_unseq,
+                // for_each(
+                //     execution::par_unseq,
+                //     word_to_substrings[ws].cbegin(),
+                //     word_to_substrings[ws].cend(),
+                //     [this](const unsigned long substr_idx)
+                //     {
+                //         to_visit_arr[substr_idx] = true;
+                //     });
+                
+                // Replace with tbb parallel for each, as Apple clang does not support parallel unseq
+                tbb::parallel_for_each(
                     word_to_substrings[ws].cbegin(),
                     word_to_substrings[ws].cend(),
                     [this](const unsigned long substr_idx)

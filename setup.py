@@ -1,8 +1,18 @@
 from sysconfig import get_path
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from pathlib import Path
 
 PATH_PREFIXES = [get_path(p) for p in ["data", "platlib"]]
+
+# Add Homebrew paths for macOS to resolve tbb dependency (Need to install tbb via Homebrew)
+import sys
+if sys.platform == "darwin":
+    PATH_PREFIXES.append("/opt/homebrew")
+
+# Setup requirements (don't install tbb-devel on macOS)
+setup_requires = ["pybind11"]
+if sys.platform != "darwin":
+    setup_requires.append("tbb-devel")
 
 modules = []
 include_dirs = [
@@ -38,7 +48,9 @@ setup(
     author="JP Lim",
     author_email="jiapeng.lim.2021@phdcs.smu.edu.sg",
     license="MIT",
-    setup_requires=["pybind11", "tbb-devel", "transformers>=4.4"],
+    packages=find_packages(),
+    install_requires=["transformers>=4.4,<5"],
+    setup_requires=setup_requires,
     url="https://github.com/PreferredAI/pcatt/",
     download_url="https://github.com/PreferredAI/pcatt/archive/refs/tags/v0.14.tar.gz",
     ext_modules=modules,
