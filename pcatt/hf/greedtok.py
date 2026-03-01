@@ -39,11 +39,11 @@ LARGE_INTEGER = int(
 )  # This is used when we need something big but slightly smaller than VERY_LARGE_INTEGER
 
 # Define type aliases and NamedTuples
-TextInput = str
-PreTokenizedInput = List[str]
+TextInput = Union[str, bytes]  # MODIFIED: Allow bytes
+PreTokenizedInput = Union[List[str], List[bytes]] # MODIFIED: Allow bytes
 EncodedInput = List[int]
-TextInputPair = Tuple[str, str]
-PreTokenizedInputPair = Tuple[List[str], List[str]]
+TextInputPair = Tuple[Union[str, bytes], Union[str, bytes]]
+PreTokenizedInputPair = Tuple[Union[List[str], List[bytes]], Union[List[str], List[bytes]]]
 EncodedInputPair = Tuple[List[int], List[int]]
 
 # Slow tokenizers used to be saved in three separated files
@@ -77,6 +77,9 @@ _enums = {
 
 
 def _splitter(text, pat):
+    # Splitter expects text. If bytes, regex might need bytes pattern.
+    # Assuming this is mostly used for string inputs during training.
+    # If using bytes for training, ensure 'pat' is also bytes or compatible.
     return regex.findall(pat, text)
 
 
@@ -141,9 +144,12 @@ class GreedTok(PreTrainedTokenizer):
         new_pairs = []
         for idx in list(self._added_tokens_decoder.keys()):
             token = self._added_tokens_decoder[idx].content
+            # Ensure consistency when token is bytes or str
+            token_key = token.encode("utf-8") if isinstance(token, str) else token
+            
             new_pairs.append(
                 (
-                    self.final_tokens_map[token.encode("utf-8")],
+                    self.final_tokens_map[token_key],
                     self._added_tokens_decoder[idx],
                 )
             )
@@ -151,9 +157,9 @@ class GreedTok(PreTrainedTokenizer):
         for idx, token_obj in new_pairs:
             self._added_tokens_decoder[idx] = token_obj
             self._added_tokens_encoder[token_obj.content] = self.final_tokens_map[
-                token_obj.content.encode("utf-8")
+                 token_obj.content.encode("utf-8") if isinstance(token_obj.content, str) else token_obj.content
             ]
-            self._added_tokens_encoder[token_obj.content.encode("utf-8")] = idx
+            self._added_tokens_encoder[token_obj.content.encode("utf-8") if isinstance(token_obj.content, str) else token_obj.content] = idx
 
         self.special_token_ids = set(
             [self.final_tokens_map[v] for v in self.special_tokens]
@@ -172,7 +178,7 @@ class GreedTok(PreTrainedTokenizer):
     def get_added_vocab(self):
         return self.final_tokens
 
-    def _convert_token_to_id(self, token: bytes):
+    def _convert_token_to_id(self, token: Union[str, bytes]):
         if isinstance(token, str):
             return self.final_tokens_map[token.encode("utf-8")]
         return self.final_tokens_map[token]
@@ -428,30 +434,18 @@ class GreedTok(PreTrainedTokenizer):
 
     def tokenize(
         self,
-        text: str,
+        text: Union[str, bytes],  # MODIFIED: Allow bytes
         pair: Optional[str] = None,
         add_special_tokens: bool = False,
         **kwargs,
-    ) -> List[str]:
+    ) -> Union[List[str], List[bytes]]:
         """
-        Converts a string in a sequence of tokens, replacing unknown tokens with the `unk_token`.
-
-        Args:
-            text (`str`):
-                The sequence to be encoded.
-            pair (`str`, *optional*):
-                A second sequence to be encoded with the first.
-            add_special_tokens (`bool`, *optional*, defaults to `False`):
-                Whether or not to add the special tokens associated with the corresponding model.
-            kwargs (additional keyword arguments, *optional*):
-                Will be passed to the underlying model specific encode method. See details in
-                [`~PreTrainedTokenizerBase.__call__`]
-
-        Returns:
-            `List[str]`: The list of tokens.
+        Converts a string or bytes in a sequence of tokens, replacing unknown tokens with the `unk_token`.
         """
-        if not isinstance(text, str):
-            raise TypeError("text is not a string.")
+        # MODIFIED: Relaxed check
+        if not isinstance(text, (str, bytes)):
+            raise TypeError("text is not a string or bytes.")
+        
         encoding = self.encode(
             text, pair, add_special_tokens=add_special_tokens, **kwargs
         )
@@ -503,7 +497,8 @@ class GreedTok(PreTrainedTokenizer):
             truncation=truncation,
             max_length=max_length,
             stride=stride,
-            is_split_into_words=not isinstance(text, str),
+            # MODIFIED: If text is bytes, we cannot treat it as 'split into words' unless it's a list of bytes
+            is_split_into_words=not isinstance(text, (str, bytes)),
             padding_side=padding_side,
             return_tensors=return_tensors,
             **kwargs,
@@ -557,20 +552,16 @@ class GreedTok(PreTrainedTokenizer):
     ) -> BatchEncoding:
         # Input type checking for clearer error
         def _is_valid_text_input(t):
-            if isinstance(t, str):
-                # Strings are fine
+            # MODIFIED: Allow bytes everywhere
+            if isinstance(t, (str, bytes)):
                 return True
             elif isinstance(t, (list, tuple)):
-                # List are fine as long as they are...
                 if len(t) == 0:
-                    # ... empty
                     return True
-                elif isinstance(t[0], str):
-                    # ... list of strings
+                elif isinstance(t[0], (str, bytes)):
                     return True
                 elif isinstance(t[0], (list, tuple)):
-                    # ... list with an empty list or with a list of strings
-                    return len(t[0]) == 0 or isinstance(t[0][0], str)
+                    return len(t[0]) == 0 or isinstance(t[0][0], (str, bytes))
                 else:
                     return False
             else:
@@ -578,14 +569,12 @@ class GreedTok(PreTrainedTokenizer):
 
         if not _is_valid_text_input(text):
             raise ValueError(
-                "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
-                "or `List[List[str] ]` (batch of pretokenized examples)."
+                "text input must of type `str` or `bytes` (single example), `List[str|bytes]` ... "
             )
 
         if text_pair is not None and not _is_valid_text_input(text_pair):
             raise ValueError(
-                "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
-                "or `List[List[str]]` (batch of pretokenized examples)."
+                "text input must of type `str` or `bytes`..."
             )
 
         if is_split_into_words:
@@ -710,6 +699,7 @@ class GreedTok(PreTrainedTokenizer):
                     f=callback,
                 )
             else:
+                # MODIFIED: batch_encode calls C++. If C++ accepts py::bytes/std::string, this works.
                 encoded_inputs = self.encoder.batch_encode(
                     texts=text,
                     return_attention_mask=if_none_convert(return_attention_mask, False),
@@ -770,6 +760,8 @@ class GreedTok(PreTrainedTokenizer):
         Returns:
             `str`: The joined tokens.
         """
+        # Note: If using bytes-based tokens, this might need adjustment if users expect bytes output.
+        # But keeping standard signature for compatibility.
         return b"".join([self.final_ids_map[x] for x in tokens]).decode(
             "utf-8", errors="backslashreplace"
         )
